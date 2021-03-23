@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 pub struct ClientConfig {
     pub user_id: ID,
     pub auth_token: String,
+    pub token_expires: u128,
     pub server_url: String,
 }
 

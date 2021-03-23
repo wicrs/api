@@ -11,6 +11,8 @@ pub enum Error {
     UnexpectedResponse,
     #[error("the login steps must be completed before building the client")]
     LoginNotComplete,
+    #[error("the given authentication token has expired")]
+    TokenExpired,
 
 }
 
