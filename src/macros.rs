@@ -88,3 +88,13 @@ macro_rules! put {
         req!($path, put, $self)
     };
 }
+
+macro_rules! member_fns {
+    ($(($fnName:ident, $fn:ident)),*) => {
+      $(
+        pub async fn $fnName(&self, hub_id: &ID, user_id: &ID) -> Result<()> {
+            post!(format!("member/{}/{}/{}", hub_id, user_id, stringify!($fn)), self)
+        }
+      )*
+    }
+  }

@@ -1,11 +1,13 @@
 use config::{ClientBuilderConfig, ClientConfig};
 use reqwest::{header::HeaderMap, StatusCode};
 pub use result::{Error, Result};
-use std::{convert::TryInto, str::FromStr};
+use std::{convert::TryInto, fmt::Display, str::FromStr};
 use wicrs_server::{
     auth::{IDToken, Service},
+    channel::{Channel, Message},
     get_system_millis,
-    hub::Hub,
+    hub::{Hub, HubMember},
+    permission::{ChannelPermission, HubPermission, PermissionSetting},
     user::{GenericUser, User},
     ApiError, ID,
 };
@@ -65,8 +67,8 @@ impl Client {
         get!("user", User, self)
     }
 
-    pub async fn get_user_by_id(&self, id: &ID) -> Result<GenericUser> {
-        get!(format!("user/{}", id), GenericUser, self)
+    pub async fn get_user_by_id(&self, user_id: &ID) -> Result<GenericUser> {
+        get!(format!("user/{}", user_id), GenericUser, self)
     }
 
     pub async fn change_username<S: Into<String>>(&self, new_name: S) -> Result<String> {
@@ -81,8 +83,176 @@ impl Client {
         post!(format!("hub/create/{}", name.into()), ID, self)
     }
 
-    pub async fn get_hub(&self, id: &ID) -> Result<Hub> {
-        get!(format!("hub/{}", id), Hub, self)
+    pub async fn get_hub(&self, hub_id: &ID) -> Result<Hub> {
+        get!(format!("hub/{}", hub_id), Hub, self)
+    }
+
+    pub async fn delete_hub(&self, hub_id: &ID) -> Result<()> {
+        req!(format!("hub/{}", hub_id), delete, self)
+    }
+
+    pub async fn rename_hub<S: Into<String>>(&self, hub_id: &ID, new_name: S) -> Result<String> {
+        put!(
+            format!("hub/rename/{}/{}", hub_id, new_name.into()),
+            String,
+            self
+        )
+    }
+
+    pub async fn is_banned_from_hub(&self, hub_id: &ID, user_id: &ID) -> Result<bool> {
+        get!(
+            format!("member/{}/{}/is_banned", hub_id, user_id),
+            bool,
+            self
+        )
+    }
+
+    pub async fn hub_member_is_muted(&self, hub_id: &ID, user_id: &ID) -> Result<bool> {
+        get!(
+            format!("member/{}/{}/is_muted", hub_id, user_id),
+            bool,
+            self
+        )
+    }
+
+    pub async fn get_hub_member(&self, hub_id: &ID, user_id: &ID) -> Result<HubMember> {
+        get!(format!("member/{}/{}", hub_id, user_id), HubMember, self)
+    }
+
+    pub async fn join_hub(&self, hub_id: &ID) -> Result<()> {
+        post!(format!("hub/join/{}", hub_id), self)
+    }
+
+    pub async fn leave_hub(&self, hub_id: &ID) -> Result<()> {
+        post!(format!("hub/leave/{}", hub_id), self)
+    }
+
+    member_fns! {
+        (kick_user, kick), (ban_user, ban), (unban_user, unban), (mute_user, mute), (unmute_user, unmute)
+    }
+
+    pub async fn change_nickname<S: Into<String>>(
+        &self,
+        hub_id: &ID,
+        new_name: S,
+    ) -> Result<String> {
+        put!(
+            format!("member/change_nickname/{}/{}", hub_id, new_name.into()),
+            String,
+            self
+        )
+    }
+
+    pub async fn create_channel<S: Into<String>>(&self, hub_id: &ID, name: S) -> Result<ID> {
+        put!(
+            format!("channel/create/{}/{}", hub_id, name.into()),
+            ID,
+            self
+        )
+    }
+
+    pub async fn get_channel(&self, hub_id: &ID, channel_id: &ID) -> Result<Channel> {
+        get!(format!("channel/{}/{}", hub_id, channel_id), Channel, self)
+    }
+
+    pub async fn delete_channel(&self, hub_id: &ID, channel_id: &ID) -> Result<()> {
+        req!(format!("channel/{}/{}", hub_id, channel_id), delete, self)
+    }
+
+    pub async fn send_message<D: Display>(
+        &self,
+        hub_id: &ID,
+        channel_id: &ID,
+        message: D,
+    ) -> Result<ID> {
+        post!(
+            format!("message/send/{}/{}/{}", hub_id, channel_id, message),
+            ID,
+            self
+        )
+    }
+
+    pub async fn get_message(
+        &self,
+        hub_id: &ID,
+        channel_id: &ID,
+        message_id: &ID,
+    ) -> Result<Message> {
+        get!(
+            format!("message/{}/{}/{}", hub_id, channel_id, message_id),
+            Message,
+            self
+        )
+    }
+
+    pub async fn get_messages(
+        &self,
+        hub_id: &ID,
+        channel_id: &ID,
+        from: Option<u128>,
+        to: Option<u128>,
+        invert: Option<bool>,
+        max: Option<u128>,
+    ) -> Result<Vec<Message>> {
+        let mut query_str = String::new();
+        if let Some(from) = from {
+            query_str = format!("?from={}", from);
+        }
+        if let Some(to) = to {
+            query_str = format!("{}&to={}", query_str, to);
+        }
+        if let Some(invert) = invert {
+            query_str = format!("{}&invert={}", query_str, invert);
+        }
+        if let Some(max) = max {
+            query_str = format!("{}&max={}", query_str, max);
+        }
+        type Messages = Vec<Message>;
+        get!(
+            format!("message/{}/{}{}", hub_id, channel_id, query_str),
+            Messages,
+            self
+        )
+    }
+
+    pub async fn set_user_hub_permission(
+        &self,
+        hub_id: &ID,
+        user_id: &ID,
+        permission: HubPermission,
+        setting: &PermissionSetting,
+    ) -> Result<()> {
+        post!(
+            format!(
+                "member/set_hub_permission/{}/{}/{}?setting={}",
+                hub_id,
+                user_id,
+                permission,
+                serde_json::to_string(setting).map_err(|_| Error::SerializeFailed)?
+            ),
+            self
+        )
+    }
+
+    pub async fn set_user_channel_permission(
+        &self,
+        hub_id: &ID,
+        channel_id: &ID,
+        user_id: &ID,
+        permission: ChannelPermission,
+        setting: &PermissionSetting,
+    ) -> Result<()> {
+        post!(
+            format!(
+                "member/set_hub_permission/{}/{}/{}/{}?setting={}",
+                hub_id,
+                channel_id,
+                user_id,
+                permission,
+                serde_json::to_string(setting).map_err(|_| Error::SerializeFailed)?
+            ),
+            self
+        )
     }
 }
 

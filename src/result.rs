@@ -5,6 +5,8 @@ pub enum Error {
     WICRSError(#[from] wicrs_server::ApiError),
     #[error("failed to build the reqwest HTTP client")]
     ReqwestClientBuild,
+    #[error("failed to serialize something")]
+    SerializeFailed,
     #[error("unable to connect to server or server did not respond")]
     Connection,
     #[error("the server responded in an unexpected way")]
