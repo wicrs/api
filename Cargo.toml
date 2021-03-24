@@ -10,7 +10,7 @@ repository = "https://github.com/wicrs/api"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wicrs_server = "0.6"
+wicrs_server = "0.7"
 reqwest = { version = "0.10", features = ["json"] }
 tokio = { version = "0.2", features = ["macros"] }
 serde = "1.0"

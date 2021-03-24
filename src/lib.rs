@@ -1,10 +1,7 @@
 use config::{ClientBuilderConfid, ClientConfig};
 use reqwest::{header::HeaderMap, StatusCode};
 pub use result::{Error, Result};
-use wicrs_server::{
-    auth::{self, IDToken, Service},
-    get_system_millis, ID,
-};
+use wicrs_server::{ApiError, ID, auth::{IDToken, Service}, get_system_millis, user::User};
 
 pub mod config;
 pub mod result;
@@ -12,7 +9,7 @@ pub mod result;
 pub struct Client {
     pub server_url: String,
     pub user_id: ID,
-    token_expires: u128,
+    pub token_expires: u128,
     client: reqwest::Client,
 }
 
@@ -47,6 +44,54 @@ impl Client {
                 client: reqwest_client,
             });
         }
+    }
+}
+
+macro_rules! json_req {
+    ($path:expr, $type:ident, $self:ident) => {
+        if let Ok(response) = $self.client.get(&format!("{}/{}", $self.server_url, $path)).send().await {
+            if let Ok(body) = response.text().await {
+                if let Ok(error) = serde_json::from_str::<ApiError>(&body) {
+                    return Err(error.into());
+                }
+                return serde_json::from_str::<$type>(&body).map_err(|_| crate::result::Error::UnexpectedResponse)
+            } else {
+                Err(crate::result::Error::Connection)
+            }
+        } else {
+            Err(crate::result::Error::Connection)
+        }
+    };
+}
+
+macro_rules! empty_req {
+    ($path:expr, $self:ident) => {
+        if let Ok(response) = $self.client.get(&format!("{}/{}", $self.server_url, $path)).send().await {
+            if response.status().is_success() {
+                return Ok(());
+            }
+            if let Ok(body) = response.text().await {
+                if let Ok(error) = serde_json::from_str::<ApiError>(&body) {
+                    Err(error.into())
+                } else {
+                    Err(crate::result::Error::Connection)
+                }
+            } else {
+                Err(crate::result::Error::Connection)
+            }
+        } else {
+            Err(crate::result::Error::Connection)
+        }
+    };
+}
+
+impl Client {
+    pub async fn get_user(&self) -> Result<User> {
+        json_req!("user", User, self)
+    }
+
+    pub async fn invalidate_tokens(&self) -> Result<()> {
+        empty_req!("invalidate_tokens", self)
     }
 }
 
@@ -93,39 +138,17 @@ impl ClientBuilder {
     }
 
     pub async fn build(self) -> Result<Client> {
-        let user_id;
-        if let Some(id) = self.user_id {
-            user_id = id;
-        } else {
-            return Err(Error::LoginNotComplete);
-        }
-        let auth_token;
-        if let Some(token) = self.auth_token {
-            auth_token = token;
-        } else {
-            return Err(Error::LoginNotComplete);
-        }
-        let token_expiry;
-        if let Some(expiry) = self.token_expiry {
-            token_expiry = expiry;
-        } else {
-            return Err(Error::LoginNotComplete);
-        }
-        let mut header_map = HeaderMap::new();
-        let header_value: reqwest::header::HeaderValue = format!("{}:{}", &user_id, auth_token)
-            .parse()
-            .map_err(|_| Error::ReqwestClientBuild)?;
-        header_map.insert(reqwest::header::AUTHORIZATION, header_value);
-        let reqwest_client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .default_headers(header_map)
-            .build()
-            .map_err(|_| Error::ReqwestClientBuild)?;
-        Ok(Client {
+        Client::from_config(ClientConfig {
+            user_id: self
+                .user_id
+                .map_or_else(|| Err(Error::LoginNotComplete), |id| Ok(id))?,
+            auth_token: self
+                .auth_token
+                .map_or_else(|| Err(Error::LoginNotComplete), |token| Ok(token))?,
+            token_expires: self
+                .token_expiry
+                .map_or_else(|| Err(Error::LoginNotComplete), |time| Ok(time))?,
             server_url: self.server_url,
-            user_id: user_id,
-            client: reqwest_client,
-            token_expires: token_expiry,
         })
     }
 }
