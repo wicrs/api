@@ -13,6 +13,7 @@ repository = "https://github.com/wicrs/api"
 wicrs_server = "0.7"
 reqwest = { version = "0.10", features = ["json"] }
 tokio = { version = "0.2", features = ["macros"] }
+uuid = "0.8"
 serde = "1.0"
 serde_json = "1.0"
 thiserror = "1.0"

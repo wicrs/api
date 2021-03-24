@@ -1,5 +1,9 @@
-use wicrs_server::{ID, auth::Service};
-use serde::{Serialize, Deserialize};
+use std::convert::TryFrom;
+
+use serde::{Deserialize, Serialize};
+use wicrs_server::{auth::Service, ID};
+
+use crate::{ClientBuilder, Error};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientConfig {
@@ -9,8 +13,36 @@ pub struct ClientConfig {
     pub server_url: String,
 }
 
+impl TryFrom<ClientBuilder> for ClientConfig {
+    type Error = Error;
+
+    fn try_from(value: ClientBuilder) -> Result<Self, Self::Error> {
+        Ok(Self {
+            user_id: value
+                .user_id
+                .map_or_else(|| Err(Error::LoginNotComplete), |id| Ok(id))?,
+            auth_token: value
+                .auth_token
+                .map_or_else(|| Err(Error::LoginNotComplete), |token| Ok(token))?,
+            token_expires: value
+                .token_expiry
+                .map_or_else(|| Err(Error::LoginNotComplete), |time| Ok(time))?,
+            server_url: value.server_url,
+        })
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ClientBuilderConfid {
+pub struct ClientBuilderConfig {
     pub server_url: String,
     pub auth_service: Service,
+}
+
+impl From<ClientBuilder> for ClientBuilderConfig {
+    fn from(builder: ClientBuilder) -> Self {
+        Self {
+            server_url: builder.server_url,
+            auth_service: builder.auth_service,
+        }
+    }
 }
