@@ -11,6 +11,7 @@ use wicrs_server::{
     user::{GenericUser, User},
     ApiError, ID,
 };
+pub use wicrs_server;
 
 pub mod config;
 pub mod result;
