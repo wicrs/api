@@ -1,6 +1,6 @@
 extern crate wicrs_api;
 
-use wicrs_api::{http::HttpClient, error::Result};
+use wicrs_api::{error::Result, http::HttpClient};
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
