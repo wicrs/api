@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Client, ClientBuilder, Method, Url,
+    Body, Client, ClientBuilder, Method, Url,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Display;
@@ -78,29 +78,14 @@ impl HttpClient {
     where
         S: Display,
     {
-        let request = self
-            .client
-            .request(
-                method,
-                Url::parse(&format!("{}{}", self.server_api_url, url))?,
-            )
-            .build()?;
-        let response = self
-            .client
-            .execute(request)
-            .await?
-            .json::<Response<String>>()
-            .await?;
-        match response {
-            Response::Success(_) => Ok(()),
-            Response::Error(error) => Err(error.into()),
-        }
+        self.request::<_, String>(method, url).await?;
+        Ok(())
     }
 
     pub async fn send<S, D, R>(&self, method: Method, url: S, data: D) -> Result<R>
     where
         S: Display,
-        D: Serialize,
+        D: Into<Body>,
         R: DeserializeOwned,
     {
         let request = self
@@ -109,7 +94,7 @@ impl HttpClient {
                 method,
                 Url::parse(&format!("{}{}", self.server_api_url, url))?,
             )
-            .body(serde_json::to_string(&data)?)
+            .body(data)
             .header("content-type", HeaderValue::from_static("application/json"))
             .build()?;
         let response = self
@@ -124,30 +109,22 @@ impl HttpClient {
         }
     }
 
-    pub async fn send_norec<S, D>(&self, method: Method, url: S, data: D) -> Result<()>
+    pub async fn send_json<S, D, R>(&self, method: Method, url: S, data: D) -> Result<R>
+    where
+        S: Display,
+        D: Serialize,
+        R: DeserializeOwned,
+    {
+        self.send(method, url, serde_json::to_string(&data)?).await
+    }
+
+    pub async fn send_json_norec<S, D>(&self, method: Method, url: S, data: D) -> Result<()>
     where
         S: Display,
         D: Serialize,
     {
-        let request = self
-            .client
-            .request(
-                method,
-                Url::parse(&format!("{}{}", self.server_api_url, url))?,
-            )
-            .body(serde_json::to_string(&data)?)
-            .header("content-type", HeaderValue::from_static("application/json"))
-            .build()?;
-        let response = self
-            .client
-            .execute(request)
-            .await?
-            .json::<Response<String>>()
-            .await?;
-        match response {
-            Response::Success(_) => Ok(()),
-            Response::Error(error) => Err(error.into()),
-        }
+        self.send_json::<_, _, String>(method, url, data).await?;
+        Ok(())
     }
 }
 
@@ -172,7 +149,7 @@ impl HttpClient {
             description,
             default_group,
         };
-        self.send(Method::POST, format!("/hub/{}", hub), update)
+        self.send_json(Method::POST, format!("/hub/{}", hub), update)
             .await
     }
 
@@ -208,7 +185,7 @@ impl HttpClient {
         from: ID,
         max: usize,
     ) -> Result<Vec<Message>> {
-        self.send(
+        self.send_json(
             Method::GET,
             format!("/message/{}/{}/after", hub, channel),
             AfterQuery { from, max },
@@ -225,7 +202,7 @@ impl HttpClient {
         max: usize,
         new_to_old: bool,
     ) -> Result<Vec<Message>> {
-        self.send(
+        self.send_json(
             Method::GET,
             format!("/message/{}/{}/time_period", hub, channel),
             TimePeriodQuery {
@@ -265,7 +242,7 @@ impl HttpClient {
         channel: ID,
         update: ChannelUpdate,
     ) -> Result<ChannelUpdate> {
-        self.send(Method::PUT, format!("/channel/{}/{}", hub, channel), update)
+        self.send_json(Method::PUT, format!("/channel/{}/{}", hub, channel), update)
             .await
     }
 
@@ -331,7 +308,7 @@ impl HttpClient {
         permission: HubPermission,
         setting: PermissionSetting,
     ) -> Result<()> {
-        self.send_norec(
+        self.send_json_norec(
             Method::PUT,
             format!("/member/{}/{}/hub_permission/{}", hub, member, permission),
             SetPermission { setting },
@@ -363,7 +340,7 @@ impl HttpClient {
         permission: ChannelPermission,
         setting: PermissionSetting,
     ) -> Result<()> {
-        self.send_norec(
+        self.send_json_norec(
             Method::PUT,
             format!(
                 "/member/{}/{}/channel_permission/{}",
