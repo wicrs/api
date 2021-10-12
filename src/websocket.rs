@@ -30,15 +30,11 @@ impl WebsocketClient {
     where
         F: Fn(Arc<Mutex<Self>>, ServerMessage) -> Option<R>,
     {
-        println!("start loop!");
         let arc = Arc::new(Mutex::new(self));
         loop {
-            println!("loop");
             let message = {
                 let arc = Arc::clone(&arc);
-                println!("await lock");
                 let mut lock = arc.lock().await;
-                println!("locked");
                 lock.next_message().await?
             };
             if let Some(r) = action(Arc::clone(&arc), message) {
