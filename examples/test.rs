@@ -1,7 +1,6 @@
 extern crate wicrs_api;
 
 use wicrs_api::{error::Result, http::HttpClient, websocket::WebsocketClient};
-use wicrs_server::websocket::ClientMessage;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -19,12 +18,8 @@ pub async fn main() -> Result<()> {
     );
     let mut ws_client_one = WebsocketClient::new(user_one, "ws://localhost:8080/api").await?;
 
-    ws_client_one
-        .send_message(ClientMessage::SubscribeHub { hub_id })
-        .await?;
-    ws_client_one
-        .send_message(ClientMessage::SubscribeChannel { hub_id, channel_id })
-        .await?;
+    ws_client_one.subscribe_hub(hub_id).await?;
+    ws_client_one.subscribe_channel(hub_id, channel_id).await?;
 
     let event_loop = tokio::spawn(ws_client_one.event_loop::<_, ()>(|_client, message| {
         match message {
