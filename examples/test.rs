@@ -1,6 +1,9 @@
 extern crate wicrs_api;
 
+use std::sync::Arc;
+
 use wicrs_api::{error::Result, http::HttpClient, websocket::WebsocketClient};
+use wicrs_server::new_id;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -16,37 +19,43 @@ pub async fn main() -> Result<()> {
         "new hub:\n  id: {}\n  name: {}\n  channel: {}",
         hub.id, hub.name, channel_id
     );
-    let mut ws_client_one = WebsocketClient::new(user_one, "ws://localhost:8080/api").await?;
+
+    let ws_client_one = WebsocketClient::new(user_one, "ws://localhost:8080/api").await?;
+
+    let ws_loop = tokio::spawn(Arc::clone(&ws_client_one).start_loop::<_, ()>(
+        |_client, message| {
+            match message {
+                wicrs_server::websocket::ServerMessage::ChatMessage {
+                    sender_id,
+                    hub_id: _,
+                    channel_id: _,
+                    message_id: _,
+                    message,
+                } => println!("{} sent '{}'", sender_id, message),
+                wicrs_server::websocket::ServerMessage::HubUpdated {
+                    hub_id,
+                    update_type,
+                } => match update_type {
+                    wicrs_server::server::HubUpdateType::UserJoined(user_id) => {
+                        println!("{} joined {}", user_id, hub_id)
+                    }
+                    wicrs_server::server::HubUpdateType::UserLeft(user_id) => {
+                        println!("{} left {}", user_id, hub_id);
+                        return Some(());
+                    }
+                    _ => (),
+                },
+                _ => (),
+            };
+            None
+        },
+    ));
 
     ws_client_one.subscribe_hub(hub_id).await?;
-    ws_client_one.subscribe_channel(hub_id, channel_id).await?;
+    println!("subscribed to hub");
 
-    let event_loop = tokio::spawn(ws_client_one.event_loop::<_, ()>(|_client, message| {
-        match message {
-            wicrs_server::websocket::ServerMessage::ChatMessage {
-                sender_id,
-                hub_id: _,
-                channel_id: _,
-                message_id: _,
-                message,
-            } => println!("{} sent '{}'", sender_id, message),
-            wicrs_server::websocket::ServerMessage::HubUpdated {
-                hub_id,
-                update_type,
-            } => match update_type {
-                wicrs_server::server::HubUpdateType::UserJoined(user_id) => {
-                    println!("{} joined {}", user_id, hub_id)
-                }
-                wicrs_server::server::HubUpdateType::UserLeft(user_id) => {
-                    println!("{} left {}", user_id, hub_id);
-                    return Some(());
-                }
-                _ => (),
-            },
-            _ => (),
-        };
-        None
-    }));
+    ws_client_one.subscribe_channel(hub_id, channel_id).await?;
+    println!("subscribed to channel");
 
     client_two.hub_join(hub_id).await?;
 
@@ -54,9 +63,15 @@ pub async fn main() -> Result<()> {
         .message_send(hub_id, channel_id, "Hello world!".to_string())
         .await?;
 
+    let _ = dbg!(
+        ws_client_one
+            .send_message(new_id(), channel_id, "test".to_string())
+            .await
+    );
+
     client_two.hub_leave(hub_id).await?;
 
-    let _ = event_loop.await;
+    let _ = ws_loop.await;
 
     Ok(())
 }

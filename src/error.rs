@@ -8,6 +8,8 @@ pub enum Error {
     Tungstenite(#[from] tokio_tungstenite::tungstenite::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error("unable to send command result to executor")]
+    TokioMpscSend,
     #[error("websocket connection closed")]
     WsClosed,
 }
