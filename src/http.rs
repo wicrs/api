@@ -1,3 +1,4 @@
+use crate::error::Result;
 use chrono::{DateTime, Utc};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
@@ -5,25 +6,12 @@ use reqwest::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Display;
-use wicrs_server::{
-    channel::{Channel, Message},
-    httpapi::Response,
-    hub::HubMember,
-    permission::{ChannelPermission, HubPermission, PermissionSetting},
-};
-use wicrs_server::{
-    error::Result,
-    httpapi::{
-        handlers::message::{AfterQuery, TimePeriodQuery},
-        routes::SetPermission,
-    },
-    hub::Hub,
-    ID,
-};
 
-pub use wicrs_server::httpapi::handlers::channel::Update as ChannelUpdate;
-pub use wicrs_server::httpapi::handlers::hub::Update as HubUpdate;
-pub use wicrs_server::httpapi::handlers::member::Status as MemberStatus;
+use wicrs_server::prelude::{
+    Channel, ChannelPermission, HttpChannelUpdate, HttpHubUpdate, HttpMemberStatus,
+    HttpMessageTimePeriodQuery, HttpMessagesAfterQuery, HttpSetPermission, Hub, HubMember,
+    HubPermission, Message, PermissionSetting, Response, ID,
+};
 
 pub struct HttpClient {
     pub server_api_url: String,
@@ -74,7 +62,7 @@ impl HttpClient {
         }
     }
 
-    pub async fn request_norec<S>(&self, method: Method, url: S) -> Result
+    pub async fn request_norec<S>(&self, method: Method, url: S) -> Result<()>
     where
         S: Display,
     {
@@ -143,8 +131,8 @@ impl HttpClient {
         name: Option<String>,
         description: Option<String>,
         default_group: Option<ID>,
-    ) -> Result<HubUpdate> {
-        let update = HubUpdate {
+    ) -> Result<HttpHubUpdate> {
+        let update = HttpHubUpdate {
             name,
             description,
             default_group,
@@ -188,7 +176,7 @@ impl HttpClient {
         self.send_json(
             Method::GET,
             format!("/message/{}/{}/after", hub, channel),
-            AfterQuery { from, max },
+            HttpMessagesAfterQuery { from, max },
         )
         .await
     }
@@ -205,7 +193,7 @@ impl HttpClient {
         self.send_json(
             Method::GET,
             format!("/message/{}/{}/time_period", hub, channel),
-            TimePeriodQuery {
+            HttpMessageTimePeriodQuery {
                 from,
                 to,
                 max,
@@ -240,8 +228,8 @@ impl HttpClient {
         &self,
         hub: ID,
         channel: ID,
-        update: ChannelUpdate,
-    ) -> Result<ChannelUpdate> {
+        update: HttpChannelUpdate,
+    ) -> Result<HttpChannelUpdate> {
         self.send_json(Method::PUT, format!("/channel/{}/{}", hub, channel), update)
             .await
     }
@@ -253,7 +241,7 @@ impl HttpClient {
 }
 
 impl HttpClient {
-    pub async fn member_status(&self, hub: ID, member: ID) -> Result<MemberStatus> {
+    pub async fn member_status(&self, hub: ID, member: ID) -> Result<HttpMemberStatus> {
         self.request(Method::GET, format!("/member/{}/{}/status", hub, member))
             .await
     }
@@ -311,7 +299,7 @@ impl HttpClient {
         self.send_json_norec(
             Method::PUT,
             format!("/member/{}/{}/hub_permission/{}", hub, member, permission),
-            SetPermission { setting },
+            HttpSetPermission { setting },
         )
         .await
     }
@@ -346,7 +334,7 @@ impl HttpClient {
                 "/member/{}/{}/channel_permission/{}",
                 hub, member, permission
             ),
-            SetPermission { setting },
+            HttpSetPermission { setting },
         )
         .await
     }

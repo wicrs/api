@@ -3,13 +3,13 @@ extern crate wicrs_api;
 use std::sync::Arc;
 
 use wicrs_api::{error::Result, http::HttpClient, websocket::WebsocketClient};
-use wicrs_server::new_id;
+use wicrs_server::prelude::new_id;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
     let server_api_url = "http://localhost:8080/api".to_string();
-    let user_one = wicrs_server::new_id();
-    let user_two = wicrs_server::new_id();
+    let user_one = new_id();
+    let user_two = new_id();
     let client_one = HttpClient::new(user_one, server_api_url.clone())?;
     let hub_id = client_one.hub_create("test".to_string()).await?;
     let hub = client_one.hub_get(hub_id).await?;
@@ -25,21 +25,21 @@ pub async fn main() -> Result<()> {
     let ws_loop = tokio::spawn(Arc::clone(&ws_client_one).start_loop::<_, ()>(
         |_client, message| {
             match message {
-                wicrs_server::websocket::ServerMessage::ChatMessage {
+                wicrs_server::prelude::WsServerMessage::ChatMessage {
                     sender_id,
                     hub_id: _,
                     channel_id: _,
                     message_id: _,
                     message,
                 } => println!("{} sent '{}'", sender_id, message),
-                wicrs_server::websocket::ServerMessage::HubUpdated {
+                wicrs_server::prelude::WsServerMessage::HubUpdated {
                     hub_id,
                     update_type,
                 } => match update_type {
-                    wicrs_server::server::HubUpdateType::UserJoined(user_id) => {
+                    wicrs_server::prelude::WsHubUpdateType::UserJoined(user_id) => {
                         println!("{} joined {}", user_id, hub_id)
                     }
-                    wicrs_server::server::HubUpdateType::UserLeft(user_id) => {
+                    wicrs_server::prelude::WsHubUpdateType::UserLeft(user_id) => {
                         println!("{} left {}", user_id, hub_id);
                         return Some(());
                     }
@@ -62,12 +62,6 @@ pub async fn main() -> Result<()> {
     client_two
         .message_send(hub_id, channel_id, "Hello world!".to_string())
         .await?;
-
-    let _ = dbg!(
-        ws_client_one
-            .send_message(new_id(), channel_id, "test".to_string())
-            .await
-    );
 
     client_two.hub_leave(hub_id).await?;
 

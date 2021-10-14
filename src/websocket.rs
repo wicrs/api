@@ -7,10 +7,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::{net::TcpStream, sync::Mutex};
 use tokio_tungstenite::tungstenite::handshake::client::Request;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use wicrs_server::{
-    websocket::{ClientMessage, ServerMessage},
-    ID,
-};
+use wicrs_server::prelude::{WsClientMessage, WsServerMessage, ID};
 
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
@@ -46,7 +43,7 @@ impl WebsocketClient {
 
     pub async fn start_loop<F, R>(self: Arc<Self>, action: F) -> Result<R>
     where
-        F: Fn(Arc<Self>, ServerMessage) -> Option<R>,
+        F: Fn(Arc<Self>, WsServerMessage) -> Option<R>,
     {
         let sender = self.sender.lock().await;
         self.loop_running.store(true, Ordering::Release);
@@ -54,12 +51,12 @@ impl WebsocketClient {
             loop {
                 let message = self.next_ws_message().await?;
                 match message {
-                    ServerMessage::Success => {
+                    WsServerMessage::Success => {
                         sender.send(Ok(())).map_err(|_| Error::TokioMpscSend)?;
                     }
-                    ServerMessage::Error(e) => {
+                    WsServerMessage::Error(e) => {
                         sender
-                            .send(Err(wicrs_server::error::Error::from(e).into()))
+                            .send(Err(e.into()))
                             .map_err(|_| Error::TokioMpscSend)?;
                     }
                     _ => {
@@ -75,7 +72,7 @@ impl WebsocketClient {
         result
     }
 
-    async fn next_ws_message(&self) -> Result<ServerMessage> {
+    async fn next_ws_message(&self) -> Result<WsServerMessage> {
         if let Some(message) = {
             let mut lock = self.websocket_recv.lock().await;
             lock.next().await
@@ -89,7 +86,7 @@ impl WebsocketClient {
     }
 
     /// Sends a message to the server over websocket, if self.sender is not locked, do not wait for response...
-    async fn send_ws_message(&self, message: ClientMessage) -> Result<()> {
+    async fn send_ws_message(&self, message: WsClientMessage) -> Result<()> {
         let mut receiver = self.receiver.lock().await;
         {
             let mut lock = self.websocket_send.lock().await;
@@ -110,7 +107,7 @@ impl WebsocketClient {
     }
 
     pub async fn send_message(&self, hub_id: ID, channel_id: ID, message: String) -> Result<()> {
-        self.send_ws_message(ClientMessage::SendMessage {
+        self.send_ws_message(WsClientMessage::SendMessage {
             hub_id,
             channel_id,
             message,
@@ -119,32 +116,32 @@ impl WebsocketClient {
     }
 
     pub async fn subscribe_hub(&self, hub_id: ID) -> Result<()> {
-        self.send_ws_message(ClientMessage::SubscribeHub { hub_id })
+        self.send_ws_message(WsClientMessage::SubscribeHub { hub_id })
             .await
     }
 
     pub async fn subscribe_channel(&self, hub_id: ID, channel_id: ID) -> Result<()> {
-        self.send_ws_message(ClientMessage::SubscribeChannel { hub_id, channel_id })
+        self.send_ws_message(WsClientMessage::SubscribeChannel { hub_id, channel_id })
             .await
     }
 
     pub async fn unsubscribe_hub(&self, hub_id: ID) -> Result<()> {
-        self.send_ws_message(ClientMessage::UnsubscribeHub { hub_id })
+        self.send_ws_message(WsClientMessage::UnsubscribeHub { hub_id })
             .await
     }
 
     pub async fn unsubscribe_channel(&self, hub_id: ID, channel_id: ID) -> Result<()> {
-        self.send_ws_message(ClientMessage::UnsubscribeChannel { hub_id, channel_id })
+        self.send_ws_message(WsClientMessage::UnsubscribeChannel { hub_id, channel_id })
             .await
     }
 
     pub async fn start_typing(&self, hub_id: ID, channel_id: ID) -> Result<()> {
-        self.send_ws_message(ClientMessage::StartTyping { hub_id, channel_id })
+        self.send_ws_message(WsClientMessage::StartTyping { hub_id, channel_id })
             .await
     }
 
     pub async fn stop_typing(&self, hub_id: ID, channel_id: ID) -> Result<()> {
-        self.send_ws_message(ClientMessage::StopTyping { hub_id, channel_id })
+        self.send_ws_message(WsClientMessage::StopTyping { hub_id, channel_id })
             .await
     }
 }
