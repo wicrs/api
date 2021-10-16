@@ -2,7 +2,7 @@ extern crate wicrs_api;
 
 use std::sync::Arc;
 
-use wicrs_api::{error::Result, http::HttpClient, websocket::WebsocketClient};
+use wicrs_api::{error::Result, http::HttpClient, websocket::asyncws::WebsocketClient};
 use wicrs_server::prelude::new_id;
 
 #[tokio::main]

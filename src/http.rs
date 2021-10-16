@@ -27,10 +27,13 @@ impl HttpClient {
             "authorization",
             HeaderValue::from_str(&auth_string).unwrap(),
         );
+        #[cfg(feature = "use-tokio")]
         let client = ClientBuilder::new()
             .default_headers(headers)
             .user_agent("WICRS Rust API")
             .build()?;
+        #[cfg(not(feature = "use-tokio"))]
+        let client = ClientBuilder::new().default_headers(headers).build()?;
         Ok(Self {
             server_api_url,
             user_id,
