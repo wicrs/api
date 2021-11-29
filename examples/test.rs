@@ -3,13 +3,12 @@ extern crate wicrs_api;
 use std::sync::Arc;
 
 use wicrs_api::{error::Result, http::HttpClient, websocket::asyncws::WebsocketClient};
-use wicrs_server::prelude::new_id;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
     let server_api_url = "http://localhost:8080/api".to_string();
-    let user_one = new_id();
-    let user_two = new_id();
+    let user_one = uuid::Uuid::new_v4();
+    let user_two = uuid::Uuid::new_v4();
     let client_one = HttpClient::new(user_one, server_api_url.clone())?;
     let hub_id = client_one.hub_create("test".to_string()).await?;
     let hub = client_one.hub_get(hub_id).await?;

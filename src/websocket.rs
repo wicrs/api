@@ -6,8 +6,8 @@ use wicrs_server::prelude::{WsClientMessage, WsServerMessage, ID};
 pub mod syncws {
     use super::*;
     use std::net::TcpStream;
-    use tungstenite::{handshake::client::Request, Message};
     use tungstenite::{connect, stream::MaybeTlsStream, WebSocket};
+    use tungstenite::{handshake::client::Request, Message};
 
     pub struct WebsocketClient {
         pub user_id: ID,
@@ -90,7 +90,11 @@ pub mod asyncws {
         sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
         sync::Mutex,
     };
-    use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::{Message, handshake::client::Request}};
+    use tokio_tungstenite::{
+        connect_async,
+        tungstenite::{handshake::client::Request, Message},
+        MaybeTlsStream, WebSocketStream,
+    };
 
     pub struct WebsocketClient {
         pub user_id: ID,
