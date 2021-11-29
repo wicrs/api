@@ -7,13 +7,30 @@ license = "GPL-3.0"
 description = "Client API for wirc_server."
 repository = "https://github.com/wicrs/api"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-wicrs_server = "0.8"
-reqwest = { version = "0.10", features = ["json"] }
-tokio = { version = "0.2", features = ["macros"] }
-uuid = "0.8"
+wicrs_server = { git = "https://github.com/wicrs/server", branch = "basic_no_auth", default-features = false }
+tokio = { version = "1.5", default-features = false, features = [
+    "macros",
+    "fs",
+    "sync",
+    "rt",
+    "rt-multi-thread",
+], optional = true }
+uuid = { version = "0.8", features = ["serde", "v4"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "json",
+    "multipart",
+] }
+tokio-tungstenite = { version = "0.15", optional = true }
+tungstenite = "0.15"
 serde = "1.0"
 serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
+futures-util = {version = "0.3", optional = true}
+url = "2.2"
+
+[features]
+use-tokio = ["tokio", "tokio-tungstenite", "futures-util"]
+default = ["use-tokio"]
+
