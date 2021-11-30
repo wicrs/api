@@ -8,7 +8,7 @@ description = "Client API for wirc_server."
 repository = "https://github.com/wicrs/api"
 
 [dependencies]
-wicrs_server = { git = "https://github.com/wicrs/server", branch = "basic_no_auth", default-features = false }
+wicrs_server = { git = "https://github.com/wicrs/server", default-features = false }
 tokio = { version = "1.5", default-features = false, features = [
     "macros",
     "fs",
@@ -31,6 +31,7 @@ futures-util = {version = "0.3", optional = true}
 url = "2.2"
 
 [features]
+wicrs-server-full = ["wicrs_server/default"]
 use-tokio = ["tokio", "tokio-tungstenite", "futures-util"]
 default = ["use-tokio"]
 
