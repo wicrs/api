@@ -9,8 +9,8 @@ use std::fmt::Display;
 
 use wicrs_server::prelude::{
     Channel, ChannelPermission, HttpChannelUpdate, HttpHubUpdate, HttpMemberStatus,
-    HttpMessageTimePeriodQuery, HttpMessagesAfterQuery, HttpSetPermission, Hub, HubMember,
-    HubPermission, Message, PermissionSetting, Response, ID,
+    HttpMessagesAfterQuery, HttpMessagesBeforeQuery, HttpMessagesBetweenQuery, HttpSetPermission,
+    Hub, HubMember, HubPermission, Message, PermissionSetting, Response, ID,
 };
 
 pub struct HttpClient {
@@ -169,7 +169,7 @@ impl HttpClient {
         .await
     }
 
-    pub async fn message_get_after(
+    pub async fn messages_get_after(
         &self,
         hub: ID,
         channel: ID,
@@ -184,7 +184,22 @@ impl HttpClient {
         .await
     }
 
-    pub async fn message_get_time_period(
+    pub async fn messages_get_before(
+        &self,
+        hub: ID,
+        channel: ID,
+        to: ID,
+        max: usize,
+    ) -> Result<Vec<Message>> {
+        self.send_json(
+            Method::GET,
+            format!("/message/{}/{}/before", hub, channel),
+            HttpMessagesBeforeQuery { to, max },
+        )
+        .await
+    }
+
+    pub async fn messages_get_between(
         &self,
         hub: ID,
         channel: ID,
@@ -195,8 +210,8 @@ impl HttpClient {
     ) -> Result<Vec<Message>> {
         self.send_json(
             Method::GET,
-            format!("/message/{}/{}/time_period", hub, channel),
-            HttpMessageTimePeriodQuery {
+            format!("/message/{}/{}/between", hub, channel),
+            HttpMessagesBetweenQuery {
                 from,
                 to,
                 max,
