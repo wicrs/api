@@ -10,9 +10,10 @@ use std::fmt::Display;
 use wicrs_server::prelude::{
     Channel, ChannelPermission, HttpChannelUpdate, HttpHubUpdate, HttpMemberStatus,
     HttpMessagesAfterQuery, HttpMessagesBeforeQuery, HttpMessagesBetweenQuery, HttpSetPermission,
-    Hub, HubMember, HubPermission, Message, PermissionSetting, Response, ID,
+    Hub, HubMember, HubPermission, Message, PermissionSetting, Response, ID, HttpLastMessagesQuery,
 };
 
+#[derive(Debug)]
 pub struct HttpClient {
     pub server_api_url: String,
     pub user_id: ID,
@@ -195,6 +196,20 @@ impl HttpClient {
             Method::GET,
             format!("/message/{}/{}/before", hub, channel),
             HttpMessagesBeforeQuery { to, max },
+        )
+        .await
+    }
+
+    pub async fn messages_get_last(
+        &self,
+        hub: ID,
+        channel: ID,
+        max: usize,
+    ) -> Result<Vec<Message>> {
+        self.send_json(
+            Method::GET,
+            format!("/message/{}/{}/last", hub, channel),
+            HttpLastMessagesQuery { max },
         )
         .await
     }
